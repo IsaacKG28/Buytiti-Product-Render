@@ -181,7 +181,7 @@ function get_product_labels($product, $sale_price) {
     if ($sale_price && $categorias) {
         foreach ($categorias as $categoria) {
             if ($categoria->name === 'Ofertas en Vivo') {
-                $output .= '<span class="etiqueta-ofertas-en-vivo">Ofertas en Vivo</span><br>';
+                $output .= '<span class="etiqueta-ofertas-en-vivo">Ofertas en Vivo</span>';
                 $esOfertaEnVivo = true;
                 break;
             }
@@ -500,11 +500,11 @@ font-weight: 600;
     .woo-products-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 0px; /* Espacio entre productos */
+        gap: 10px; /* Espacio entre productos */
     }
     .woo-product-item {
         height: 27.5rem;
-        width: 11rem;
+        width: auto;
         margin-bottom: 1rem;
       }
       .input-quantity-buytiti{ 
@@ -516,6 +516,19 @@ font-weight: 600;
   }
     .woo-product-item img {
         max-width: 110px;
+    }
+    .product-title-buytiti{
+        height: 6.5rem;
+    }
+    .sku-class-buytiti{
+        height: 1.2rem;
+        display: grid;
+        margin-top: .5rem;
+    }
+    .product-brand-buytiti {
+        margin-top: 0rem;
+        height: 1rem;
+        display: grid;
     }
 }
 
@@ -559,11 +572,27 @@ font-weight: 600;
     width: 8.5rem;
     font-size: 0.85rem !important;
     }
-}
-@media screen and (min-width: 1024px) and (max-width: 1590px) {
+}@media screen and (min-width: 781px) and (max-width: 1024px) {
     .woo-products-grid {
         display: grid;
-        grid-template-columns: repeat(6, 1fr); /* Seis columnas para el diseño de cuadrícula */
+        grid-template-columns: repeat(4, 1fr); /* Seis columnas para el diseño de cuadrícula */
+        gap: 10px; /* Espacio entre productos */
+    }
+    .woo-product-item {
+        width: 100%;
+    }
+    .button-compra-buytiti {
+        width: 8rem;
+    }
+    .product-discount-buytiti{
+        font-size: .69rem;
+        width: 2rem;
+    }
+}
+@media screen and (min-width: 1024px) and (max-width: 1420px) {
+    .woo-products-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr); /* Seis columnas para el diseño de cuadrícula */
         gap: 10px; /* Espacio entre productos */
     }
     .woo-product-item {
@@ -579,23 +608,7 @@ font-weight: 600;
     }
 
 }
-@media screen and (min-width: 781px) and (max-width: 1024px) {
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 10px; /* Espacio entre productos */
-    }
-    .woo-product-item {
-        width: 100%;
-    }
-    .button-compra-buytiti {
-        width: 8rem;
-    }
-    .product-discount-buytiti{
-        font-size: .69rem;
-        width: 2rem;
-    }
-}
+
     ";
 
     // Asegúrate de que los estilos se añaden al final de la cola de estilos
