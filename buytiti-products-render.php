@@ -24,19 +24,21 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
     return;
 }
 
-function mi_woo_productos_shortcode( $atts ) {
+function mi_woo_productos_shortcode($atts) {
     // Establecer atributos por defecto
     $atts = shortcode_atts(
         array(
             'cantidad' => 6, // Número de productos por defecto
-            'categoria' => '', // Categoría del producto ( puede ser vacío )
+            'categoria' => '', // Categoría del producto (puede ser vacío)
+            'slider' => 'no' // Por defecto, no mostrar como slider
         ),
         $atts,
         'mi_woo_productos' // Nombre del shortcode
     );
 
     // Convertir el valor del atributo 'cantidad' a un entero
-    $cantidad = intval( $atts[ 'cantidad' ] );
+    $cantidad = intval($atts['cantidad']);
+    $mostrar_como_slider = $atts['slider'] === 'yes';
 
     // Argumentos para la consulta de productos
     $args = array(
@@ -73,7 +75,7 @@ function mi_woo_productos_shortcode( $atts ) {
     }
 
     // Iniciar contenedor con estilo de cuadrícula
-    $output = '<div class="woo-products-grid">';
+    $output = $mostrar_como_slider ? '<div class="buytiti-product-slider">' : '<div class="woo-products-grid">';
 
 
     while ($query->have_posts()) {
@@ -199,7 +201,7 @@ function get_product_labels($product, $sale_price) {
     }
 
     if ($sale_price && !$esOfertaEnVivo && !$esLiquidacion) {
-        $output .= '<span class="etiqueta-oferta">Oferta</span>';
+        $output .= '<span class="etiqueta-oferta">Remate</span>';
     }
 
     return $output;
@@ -207,17 +209,17 @@ function get_product_labels($product, $sale_price) {
 
 
 // Registrar el shortcode
-add_shortcode( 'mi_woo_productos', 'mi_woo_productos_shortcode' );
+add_shortcode('mi_woo_productos', 'mi_woo_productos_shortcode');
 
-// Si estás agregando scripts relacionados con imágenes
-if ( !function_exists( 'mi_woo_productos_enqueue_imagen_scripts' ) ) {
-    function mi_woo_productos_enqueue_imagen_scripts() {
-        wp_enqueue_script( 'jquery' );
-        wp_enqueue_script( 'buytiti-productos-script', plugin_dir_url( __FILE__ ) . 'script.js', array( 'jquery' ), null, true );
-
-        // JavaScript en línea para el hover de imagen
+// Función para encolar todos los scripts y estilos necesarios
+if (!function_exists('mi_woo_productos_enqueue_scripts')) {
+    function mi_woo_productos_enqueue_scripts() {
+        wp_enqueue_script('jquery');
+        wp_enqueue_script('buytiti-productos-script', plugin_dir_url(__FILE__) . 'script.js', array('jquery'), null, true);
+        // JavaScript en línea para el hover de imagen, Slick Slider y añadir producto al carrito con AJAX
         $js = '
         jQuery(document).ready(function($) {
+            // Hover de imagen
             $(".product-image-link").on("mouseover", function() {
                 var primaryImage = $(this).find(".primary-image");
                 var secondaryImage = $(this).find(".secondary-image");
@@ -239,381 +241,113 @@ if ( !function_exists( 'mi_woo_productos_enqueue_imagen_scripts' ) ) {
                     secondaryImage.attr("src", temp);
                 }
             });
+
+            // Inicializar Slick Slider si el contenedor existe
+            if ($(".buytiti-product-slider").length) {
+                $(".buytiti-product-slider").slick({
+                    infinite: true,
+                    autoplay: true,
+                    autoplaySpeed: 3000,
+                    speed: 300,
+                    slidesToShow: 5,
+                    slidesToScroll: 1,
+                    responsive: [
+                        {
+                            breakpoint: 1590,
+                            settings: {
+                                slidesToShow: 4,
+                                slidesToScroll: 1,
+                                infinite: true,
+                                autoplay: true,
+                            }
+                        },
+                        {
+                            breakpoint: 1366,
+                            settings: {
+                                slidesToShow: 3,
+                                slidesToScroll: 1,
+                                infinite: true,
+                                autoplay: true,
+                            }
+                        },
+                        {
+                            breakpoint: 1024,
+                            settings: {
+                                slidesToShow: 3,
+                                slidesToScroll: 1,
+                                infinite: true,
+                                autoplay: true,
+                            }
+                        },
+                        {
+                            breakpoint: 600,
+                            settings: {
+                                slidesToShow: 2,
+                                slidesToScroll: 1,
+                                infinite: true,
+                                autoplay: true,
+                            }
+                        },
+                        {
+                            breakpoint: 480,
+                            settings: {
+                                slidesToShow: 2,
+                                slidesToScroll: 1,
+                                infinite: true,
+                                autoplay: true,
+                            }
+                        }
+                    ]
+                });
+            }
+
+            // Añadir producto al carrito con AJAX y recargar la misma página
+            $(".woo-add-to-cart").on("click", function(event) {
+                event.preventDefault(); // Evitar el comportamiento predeterminado del formulario
+
+                var product_id = $(this).data("product-id"); // Obtener el ID del producto
+                var quantity = $(this).siblings("input[name=quantity]").val(); // Obtener la cantidad ingresada
+
+                // Lógica AJAX para añadir al carrito
+                $.ajax({
+                    url: wc_add_to_cart_params.ajax_url, // URL AJAX de WooCommerce
+                    method: "POST",
+                    data: {
+                        action: "woocommerce_ajax_add_to_cart", // Acción para añadir al carrito
+                        product_id: product_id,
+                        quantity: quantity, // Añadir la cantidad al data
+                    },
+                    success: function(response) {
+                        if (response.error) {
+                            alert("Error al añadir al carrito: " + response.error);
+                        } else {
+                            // Si el producto se añadió correctamente, recargar la misma página
+                            location.reload();
+                        }
+                    },
+                    error: function() {
+                        alert("Ocurrió un error al añadir al carrito.");
+                    }
+                });
+            });
         });
         ';
 
-        wp_add_inline_script( 'buytiti-productos-script', $js );
+        wp_add_inline_script('buytiti-productos-script', $js);
+
+        // Registrar y encolar el archivo CSS del plugin
+        wp_register_style('buytiti-productos-style', false);
+        wp_enqueue_style('buytiti-productos-style');
     }
-}
-
-// Usa un nuevo nombre para la acción
-add_action( 'wp_enqueue_scripts', 'mi_woo_productos_enqueue_imagen_scripts' );
-
-// Script para añadir producto al carrito con AJAX y recargar la misma página
-
-function mi_woo_productos_enqueue_scripts() {
-    // Asegurarse de que WooCommerce tiene los parámetros necesarios para AJAX
-    wp_enqueue_script( 'jquery' );
-    // Asegurarse de que jQuery esté encolado
-    $js = '
-    jQuery(document).ready(function($) {
-        $(".woo-add-to-cart").on("click", function(event) {
-            event.preventDefault(); // Evitar el comportamiento predeterminado del formulario
-            
-            var product_id = $(this).data("product-id"); // Obtener el ID del producto
-            var quantity = $(this).siblings("input[name=quantity]").val(); // Obtener la cantidad ingresada
-            
-            // Lógica AJAX para añadir al carrito
-            $.ajax({
-                url: wc_add_to_cart_params.ajax_url, // URL AJAX de WooCommerce
-                method: "POST",
-                data: {
-                    action: "woocommerce_ajax_add_to_cart", // Acción para añadir al carrito
-                    product_id: product_id,
-                    quantity: quantity, // Añadir la cantidad al data
-                },
-                success: function(response) {
-                    if (response.error) {
-                        alert("Error al añadir al carrito: " + response.error);
-                    } else {
-                        // Si el producto se añadió correctamente, recargar la misma página
-                        location.reload();
-                    }
-                },
-                error: function() {
-                    alert("Ocurrió un error al añadir al carrito.");
-                }
-            });
-        });
-    });
-    ';
-    wp_add_inline_script( 'jquery', $js );
-    // Encolar el script en línea después de jQuery
 }
 
 // Agregar la función al gancho para encolar scripts
-add_action( 'wp_enqueue_scripts', 'mi_woo_productos_enqueue_scripts' );
-
-// Función para agregar el archivo CSS del plugin
-function register_empty_style() {
-    wp_register_style( 'buytiti-productos-style', false );
-    wp_enqueue_style( 'buytiti-productos-style' );
-}
-
-add_action( 'wp_enqueue_scripts', 'register_empty_style' );
-
-function mi_woo_productos_inline_styles() {
-    // Aquí puedes definir tus estilos en línea
-    $custom_css = "
-    /* Estilos para el plugin de productos WooCommerce */
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(6, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 20px; /* Espacio entre productos */
-    }
-    
-    .woo-product-item {
-        position: relative;
-        text-align: center; /* Centrar el contenido */
-        border: 1px solid #ddd; /* Bordes para los productos */
-        padding: 10px;
-        border-radius: 20px;
-        height: 29.5rem;
-        width: 100%;
-    }
-    
-    .woo-product-item img {
-        max-width: 140px; /* Limitar el tamaño de las imágenes */
-        height: auto; /* Mantener la relación de aspecto */
-        margin-top: 1.5rem;
-        transition: 1s;
-    }
-    .woo-product-item img:hover{ 
-    transform: scale(1.1);
-    cursor: pointer;
-    }
-
-    .new-product{
-        position: absolute; 
-        top: 0; 
-        left: 0; 
-        z-index: 1;
-        background-color: #f2fff6;
-        border: 1px solid #058427;
-        border-radius: 20px 0px 0px 0px;    
-        color: #058427;
-        width: 4rem;
-        font-size: 1rem;
-    }
-    
-    .etiqueta-liquidacionSinApi{
-        position: absolute;
-        top: 0;
-        right: 0;
-        background-color: #e4c311; 
-        color: #ffffff; 
-        padding: 3px;
-        z-index: 1;  
-        font-size: .9rem;
-        font-weight: 700;
-        border-radius: 0px 20px 0px 10px;
-    }
-    .etiqueta-ofertas-en-vivo{
-        position: absolute;
-    top: 0;
-    right: 0;
-    background-color: #F7CACA;
-    color: red;
-    padding: 3px;
-    z-index: 1;
-    font-size: .9rem;
-    font-weight: 700;
-    border-radius: 0px 20px 0px 10px;
-    width: 8.5rem;
-    }
-
-    .etiqueta-ofertas-en-vivo::before {
-    content: '•'; /* El punto */
-    position: absolute;
-    left: 0; /* Alineado a la izquierda */
-    top: -5%; /* Centrar verticalmente */
-    transform: translateY(-50%); /* Ajustar para centrar */
-    color: red; /* Color del punto */
-    animation: pulse 1s infinite; /* Aplica la animación de pulso */
-    font-size: 2rem;
-    margin-left: -.2rem;
-    padding-left: .2rem;
-}
-@keyframes pulse {
-    0% {
-        transform: scale(1);
-        opacity: 1;
-    }
-    50% {
-        transform: scale(1.2); /* Aumenta el tamaño */
-        opacity: 0.7; /* Reduce la opacidad */
-    }
-    100% {
-        transform: scale(1);
-        opacity: 1; /* Vuelve al estado original */
-    }
-}
-    
-    .button-compra-buytiti{
-           width: 9.9rem;
-    justify-content: center;
-    display: flex;
-    margin-left: -2rem;
-    align-items: center;
-    background-color: #ef7e28 !important;
-    height: 2.5rem;
-    right: 0;
-    position: absolute;
-    border-radius: 20px 0px 20px 0px !important;
-    bottom: 0;
-    }
-    
-    .sku-class-buytiti{
-      color: #00c9b7;
-    font-size: .8rem;
-    font-weight: 700;
-    text-align: center;
-    }
-    
-    .input-quantity-buytiti{ 
-    position: absolute;
-    left: 0;
-    bottom: 0;
-    border-radius: 0px 10px 0px 20px !important;
-    height: 2rem !important;
-    max-width: 70px !important;
-    }
-    
-    .stock-quantity-buytitisinapi{ 
-    background-color: #fde5cb;
-    border: 1px solid #ff7942;
-    border-radius: 15px 0 0 15px;
-    color: coral;
-    font-size: .6rem;
-    font-weight: 700;
-    right: 0;
-    padding: 0 3px;
-    width: 5.2rem;
-    position: absolute;
-    top: 41%;
-    display: none;
-    }
-    
-    .product-brand-buytiti {
-    color: #8b8b8b !important;
-    font-size: .7rem;
-    font-weight: 600;
-    letter-spacing: .3px;
-    margin-top: -1.5rem;
-    text-align: center;
-    text-transform: uppercase;
-}
-
-.product-link-buytiti {
-    text-decoration: none !important;
-}
-
-.product-title-buytiti {
-    color: #5c5c5c !important;
-    font-size: .9rem !important;
-    overflow: hidden ;
-    margin-top: -1rem ;
-    font-weight: 700 !important;
-    height: 5.5rem;
-    display: inline-grid;
-}
-
-.precio-regular-tachado{
-opacity: .8;
-font-weight: 600;
-}
-.sale-price{
-    font-size: 1.2rem;
-    color: red;
-    font-weight: 700;
-}
-.precio-regular{
-    font-size: 1.2rem;
-    font-weight: 700;
-    color: #ff7942;
-}
-.product-discount-buytiti{
-        position: absolute;
-    top: 7%;
-    right: 0;
-    background-color: coral;
-    color: #ffffff;
-    padding: 3px;
-    z-index: 1;
-    font-size: .9rem;
-    font-weight: 600;
-    border-radius: 0px 0px 0px 10px;
-    width: 3rem;
-}
-
-@media screen and (min-width: 201px) and (max-width: 400px) {
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 10px; /* Espacio entre productos */
-    }
-    .woo-product-item {
-        height: 27.5rem;
-        width: auto;
-        margin-bottom: 1rem;
-      }
-      .input-quantity-buytiti{ 
-    max-width: 60px !important;
-    }
-     .button-compra-buytiti{
-    width: 7.7rem;
-    font-size: 0.8rem !important;
-  }
-    .woo-product-item img {
-        max-width: 110px;
-    }
-    .product-title-buytiti{
-        height: 6.5rem;
-    }
-    .sku-class-buytiti{
-        height: 1.2rem;
-        display: grid;
-        margin-top: .5rem;
-    }
-    .product-brand-buytiti {
-        margin-top: 0rem;
-        height: 1rem;
-        display: grid;
-    }
-}
-
-@media screen and (min-width: 401px) and (max-width: 600px) {
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(2, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 0px; /* Espacio entre productos */
-    }
-    .woo-product-item {
-        height: 30.5rem;
-        width: 98%;
-        margin-bottom: 1rem;
-    }
-    .input-quantity-buytiti{ 
-    max-width: 60px !important;
-    }
-     .button-compra-buytiti{
-    width: 9.5rem;
-    }
-    .woo-product-item img {
-        max-width: 110px;
-    }
-}
-
-@media screen and (min-width: 601px) and (max-width: 780px) {
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 0px; /* Espacio entre productos */
-    }
-    .woo-product-item {
-        height: 32.5rem;
-        width: 13rem;
-        margin-bottom: 1rem;
-    }
-     .input-quantity-buytiti{ 
-    max-width: 60px !important;
-    }
-     .button-compra-buytiti{
-    width: 8.5rem;
-    font-size: 0.85rem !important;
-    }
-}@media screen and (min-width: 781px) and (max-width: 1024px) {
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 10px; /* Espacio entre productos */
-    }
-    .woo-product-item {
-        width: 100%;
-    }
-    .button-compra-buytiti {
-        width: 8rem;
-    }
-    .product-discount-buytiti{
-        font-size: .69rem;
-        width: 2rem;
-    }
-}
-@media screen and (min-width: 1024px) and (max-width: 1420px) {
-    .woo-products-grid {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr); /* Seis columnas para el diseño de cuadrícula */
-        gap: 10px; /* Espacio entre productos */
-    }
-    .woo-product-item {
-        width: 100%;
-    }
-    .button-compra-buytiti {
-        width: 7.77rem;
-        font-size: 0.78rem !important;
-    }
-    .product-discount-buytiti{
-        font-size: .69rem;
-        width: 2rem;
-    }
-
-}
-
-    ";
-
-    // Asegúrate de que los estilos se añaden al final de la cola de estilos
-    wp_add_inline_style( 'buytiti-productos-style', $custom_css );
-}
+add_action('wp_enqueue_scripts', 'mi_woo_productos_enqueue_scripts');
 
 // Agrega la función al gancho para encolar scripts y estilos
 add_action( 'wp_enqueue_scripts', 'mi_woo_productos_inline_styles' );
+function mi_woo_productos_enqueue_styles() {
+    wp_enqueue_style( 'buytiti-products-render-style', plugin_dir_url( __FILE__ ) . 'buytiti-products-render.css' );
+}
+
+add_action( 'wp_enqueue_scripts', 'mi_woo_productos_enqueue_styles' );
